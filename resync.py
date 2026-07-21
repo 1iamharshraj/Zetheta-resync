@@ -219,6 +219,8 @@ def process_single_record(
     record: Dict[str, Any],
     is_tech: bool,
     dry_run: bool,
+    job_id: str = None,
+    run_type: str = None,
 ) -> ResultRecord:
     """
     For one submission record:
@@ -227,6 +229,22 @@ def process_single_record(
       3. Extract the percentage.
       4. Call the update_submissions API.
     """
+    from loki_config import set_context, clear_context
+    set_context(job_id=job_id, run_type=run_type)
+    try:
+        result = _process_single_record_impl(app_code, record, is_tech, dry_run)
+    finally:
+        clear_context()
+    return result
+
+
+def _process_single_record_impl(
+    app_code: str,
+    record: Dict[str, Any],
+    is_tech: bool,
+    dry_run: bool,
+) -> ResultRecord:
+    """Internal implementation; context is managed by the wrapper above."""
     user_id = record.get("user_id")
     course_id = record.get("course_id")
     course_number = record.get("course_number", "")
@@ -462,8 +480,21 @@ def run_resync(config: Dict[str, Any]) -> Dict[str, Any]:
     Programmatic entry point to run the resync job.
     Returns a dict with job metadata, counts, and per-record results.
     """
+    from loki_config import set_context, clear_context
     job_id = config.get("job_id", str(int(time.time())))
     run_type = config.get("type", "all")
+    set_context(job_id=job_id, run_type=run_type)
+
+    try:
+        result = _run_resync_impl(config, job_id, run_type)
+    finally:
+        clear_context()
+
+    return result
+
+
+def _run_resync_impl(config: Dict[str, Any], job_id: str, run_type: str) -> Dict[str, Any]:
+    """Internal implementation; context is managed by the wrapper above."""
     limit = int(config.get("limit", 0))
     workers = int(config.get("workers", 5))
     dry_run = bool(config.get("dry_run", False))
@@ -510,7 +541,7 @@ def run_resync(config: Dict[str, Any]) -> Dict[str, Any]:
         with ThreadPoolExecutor(max_workers=workers) as executor:
             future_to_record = {
                 executor.submit(
-                    process_single_record, app_code, record, is_tech, dry_run
+                    process_single_record, app_code, record, is_tech, dry_run, job_id, run_type
                 ): record
                 for record in submissions
             }
