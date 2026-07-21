@@ -4,6 +4,8 @@ This guide covers running the Zetheta resync service locally with Docker Compose
 
 ## Local development with Docker Compose
 
+The app, Loki, and Grafana all keep running. Resync jobs run in background threads and complete independently; the web service does **not** shut down after a job finishes. The Grafana dashboard shows the **last sync** at the top.
+
 ### 1. Configure environment
 
 ```bash
@@ -22,6 +24,7 @@ This starts:
 - **Loki** on `http://localhost:3100`
 - **Grafana** on `http://localhost:3000` (login: `admin` / `admin`)
 
+The default setup uses **1 gunicorn worker** and **3 resync workers** to keep CPU usage low. CSV outputs and Loki logs older than **3 days** are automatically cleaned up.
 ### 3. Trigger a resync
 
 ```bash
@@ -147,6 +150,8 @@ Use the VM's external IP:
 - App: `http://<VM_EXTERNAL_IP>:5000`
 - Grafana: `http://<VM_EXTERNAL_IP>:3000` (admin/admin)
 
+The systemd service keeps the app running. When a resync finishes, the app stays up and the Grafana dashboard shows the last sync.
+
 ### 5. Manage the service
 
 ```bash
@@ -184,19 +189,27 @@ curl -X POST http://<VM_EXTERNAL_IP>:5000/api/v1/run \
 
 ---
 
-## Loki log retention
+## Loki log retention and disk usage
 
-Loki is configured to retain logs for **7 days**. Older logs are automatically deleted by the compactor.
+Loki is configured to retain logs for **3 days** by default. Older logs are automatically deleted by the compactor.
 
-To change retention, edit `loki/loki-config.yaml` and adjust:
+The app also deletes CSV output files in `runs/` older than **3 days** after each job finishes.
+
+To change retention, edit `.env`:
+
+```ini
+OUTPUT_RETENTION_DAYS=3
+```
+
+And edit `loki/loki-config.yaml`:
 
 ```yaml
 limits_config:
-  retention_period: 168h  # 7 days
+  retention_period: 72h  # 3 days
 
 table_manager:
   retention_deletes_enabled: true
-  retention_period: 168h
+  retention_period: 72h
 ```
 
 Then restart the Loki container:
@@ -205,6 +218,12 @@ Then restart the Loki container:
 docker compose restart loki
 ```
 
+### Reducing GCP disk and core usage
+
+- **Gunicorn workers**: default is `1` (set in `scripts/start.sh` and `Dockerfile`). Increase only if the VM has multiple cores.
+- **Resync workers**: default is `3` (set via `RESYNC_WORKERS`). Lower it to `1` or `2` on small VMs.
+- **Loki storage**: uses local filesystem inside the container. For production, attach a small persistent disk (20 GB is enough for moderate log volume) and mount it to `/tmp/loki`.
+- **VM sizing**: `e2-medium` (2 vCPU, 4 GB) is sufficient for low-to-moderate load.
 ---
 
 ## Troubleshooting

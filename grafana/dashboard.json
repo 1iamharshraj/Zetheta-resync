@@ -50,7 +50,9 @@
       "options": {
         "orientation": "auto",
         "reduceOptions": {
-          "calcs": ["lastNotNull"],
+          "calcs": [
+            "lastNotNull"
+          ],
           "fields": "",
           "values": false
         },
@@ -98,7 +100,9 @@
       "options": {
         "orientation": "auto",
         "reduceOptions": {
-          "calcs": ["lastNotNull"],
+          "calcs": [
+            "lastNotNull"
+          ],
           "fields": "",
           "values": false
         }
@@ -143,7 +147,9 @@
       "options": {
         "orientation": "auto",
         "reduceOptions": {
-          "calcs": ["lastNotNull"],
+          "calcs": [
+            "lastNotNull"
+          ],
           "fields": "",
           "values": false
         }
@@ -188,7 +194,9 @@
       "options": {
         "orientation": "auto",
         "reduceOptions": {
-          "calcs": ["lastNotNull"],
+          "calcs": [
+            "lastNotNull"
+          ],
           "fields": "",
           "values": false
         }
@@ -205,10 +213,35 @@
     {
       "datasource": "Loki",
       "gridPos": {
-        "h": 10,
+        "h": 4,
         "w": 24,
         "x": 0,
         "y": 8
+      },
+      "id": 7,
+      "options": {
+        "showLabels": false,
+        "showTime": true,
+        "sortOrder": "Descending",
+        "wrapLogMessage": true,
+        "dedupStrategy": "none"
+      },
+      "targets": [
+        {
+          "expr": "{job=\"app-logs\"} |= \"[DONE] Total records processed\"",
+          "refId": "A"
+        }
+      ],
+      "title": "Last Sync Summary",
+      "type": "logs"
+    },
+    {
+      "datasource": "Loki",
+      "gridPos": {
+        "h": 10,
+        "w": 24,
+        "x": 0,
+        "y": 12
       },
       "id": 5,
       "options": {
@@ -272,7 +305,7 @@
         "h": 8,
         "w": 24,
         "x": 0,
-        "y": 18
+        "y": 22
       },
       "id": 6,
       "options": {
@@ -296,7 +329,10 @@
   "refresh": "30s",
   "schemaVersion": 38,
   "style": "dark",
-  "tags": ["zetheta", "resync"],
+  "tags": [
+    "zetheta",
+    "resync"
+  ],
   "templating": {
     "list": [
       {

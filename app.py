@@ -32,6 +32,8 @@ APP_CODE = os.environ.get("APP_CODE", "").strip()
 FLASK_PORT = int(os.environ.get("FLASK_PORT", "5000"))
 LOKI_URL = os.environ.get("LOKI_URL", "http://localhost:3100")
 RUN_OUTPUT_DIR = os.environ.get("RUN_OUTPUT_DIR", "./runs")
+RESYNC_WORKERS = int(os.environ.get("RESYNC_WORKERS", "3"))
+OUTPUT_RETENTION_DAYS = int(os.environ.get("OUTPUT_RETENTION_DAYS", "3"))
 
 if not os.path.isdir(RUN_OUTPUT_DIR):
     os.makedirs(RUN_OUTPUT_DIR, exist_ok=True)
@@ -54,6 +56,22 @@ _lock = threading.Lock()
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+def cleanup_old_outputs() -> None:
+    """Delete CSV output files older than OUTPUT_RETENTION_DAYS to save disk."""
+    cutoff = time.time() - (OUTPUT_RETENTION_DAYS * 24 * 60 * 60)
+    removed = 0
+    for fname in os.listdir(RUN_OUTPUT_DIR):
+        fpath = os.path.join(RUN_OUTPUT_DIR, fname)
+        if os.path.isfile(fpath) and fname.endswith(".csv") and os.path.getmtime(fpath) < cutoff:
+            try:
+                os.remove(fpath)
+                removed += 1
+            except OSError as exc:
+                logging.warning("[CLEANUP] Could not remove %s: %s", fpath, exc)
+    if removed:
+        logging.info("[CLEANUP] Removed %d old output CSV(s)", removed)
+
+
 def get_app_code() -> str:
     """Return app code from env; raise if missing."""
     code = APP_CODE or resync_get_app_code(type("Args", (), {"app_code": "", "env_file": ".env"})())
@@ -95,6 +113,8 @@ def run_job(job_id: str, config: Dict[str, Any]) -> None:
         with _lock:
             if current_job_id == job_id:
                 current_job_id = None
+        cleanup_old_outputs()
+        logging.info("[JOB] Job %s finished", job_id)
 
 
 def build_config(payload: Dict[str, Any]) -> Dict[str, Any]:
@@ -107,7 +127,7 @@ def build_config(payload: Dict[str, Any]) -> Dict[str, Any]:
     if limit < 0:
         raise ValueError("limit must be >= 0")
 
-    workers = int(payload.get("workers", 5))
+    workers = int(payload.get("workers", RESYNC_WORKERS))
     if workers < 1:
         raise ValueError("workers must be >= 1")
 

@@ -40,6 +40,7 @@ services:
     environment:
       - LOKI_URL=http://loki:3100
       - RUN_OUTPUT_DIR=/app/runs
+      - RESYNC_WORKERS=${RESYNC_WORKERS:-3}
     volumes:
       - ./runs:/app/runs
     networks:

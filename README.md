@@ -91,9 +91,11 @@ docker compose up --build -d
 - Grafana: `http://localhost:3000` (admin/admin)
 - Loki: `http://localhost:3100`
 
+The app stays running. Resync jobs run in the background and the Grafana dashboard shows the **last sync** at the top. Logs and CSV outputs older than 3 days are automatically cleaned up.
+
 ### GCP deployment with systemd + gunicorn
 
-See [DEPLOYMENT.md](DEPLOYMENT.md) for full GCP Compute Engine setup.
+See [DEPLOYMENT.md](DEPLOYMENT.md) for full GCP Compute Engine setup. The default configuration uses 1 gunicorn worker and 3 resync workers to minimise disk and CPU usage on small VMs.
 
 ## CLI options
 
