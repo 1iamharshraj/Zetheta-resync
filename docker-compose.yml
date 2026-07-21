@@ -1,0 +1,58 @@
+version: "3.8"
+
+services:
+  loki:
+    image: grafana/loki:2.9.0
+    container_name: zetheta-loki
+    ports:
+      - "3100:3100"
+    volumes:
+      - ./loki/loki-config.yaml:/etc/loki/local-config.yaml:ro
+      - loki-data:/tmp/loki
+    command: -config.file=/etc/loki/local-config.yaml
+    networks:
+      - zetheta-net
+
+  grafana:
+    image: grafana/grafana:10.0.0
+    container_name: zetheta-grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      - ./grafana/datasource.yaml:/etc/grafana/provisioning/datasources/datasource.yaml:ro
+      - ./grafana/dashboard.yaml:/etc/grafana/provisioning/dashboards/dashboard.yaml:ro
+      - ./grafana/dashboard.json:/etc/grafana/dashboards/dashboard.json:ro
+      - grafana-data:/var/lib/grafana
+    networks:
+      - zetheta-net
+    depends_on:
+      - loki
+
+  app:
+    build: .
+    container_name: zetheta-app
+    ports:
+      - "5000:5000"
+    env_file:
+      - .env
+    environment:
+      - LOKI_URL=http://loki:3100
+      - RUN_OUTPUT_DIR=/app/runs
+    volumes:
+      - ./runs:/app/runs
+    networks:
+      - zetheta-net
+    depends_on:
+      - loki
+
+networks:
+  zetheta-net:
+    driver: bridge
+
+volumes:
+  loki-data:
+  grafana-data:
