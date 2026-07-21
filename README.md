@@ -1,14 +1,15 @@
-# Zetheta Submission Resync CLI
+# Zetheta Submission Resync
 
-A dependency-free Python 3 CLI that:
+A dependency-free Python 3 CLI and Flask web service that:
 
 1. Fetches the **tech** submissions list from `https://www.zetheta.com/wp-json/v1/submissions`
 2. Fetches the **non-tech** submissions list from `https://www.zetheta.com/wp-json/v1/submissions/?type=nontech`
 3. Builds each user's report JSON URI from the submission data
 4. Fetches the report JSON to extract the `percentage` score
 5. Calls the `update_submissions` API for each record
+6. Pushes logs to Loki and visualises them in Grafana
 
-## Usage
+## CLI usage
 
 Run each command separately. The `#` comments above them are just descriptions, not part of the command.
 
@@ -33,6 +34,66 @@ python3 resync.py --app-code "YOUR_APP_CODE_HERE" --type nontech --limit 50 --ve
 # Adjust concurrency and write a summary CSV
 python3 resync.py --app-code "YOUR_APP_CODE_HERE" --workers 3 --output results.csv
 ```
+
+## Web service
+
+You can also run the resync as a Flask web service with HTTP endpoints and Loki/Grafana observability.
+
+### Quick start
+
+```bash
+pip install -r requirements.txt
+python3 app.py
+```
+
+Endpoints:
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/api/v1/health` | Health check |
+| POST | `/api/v1/run` | Trigger a resync job |
+| GET | `/api/v1/status` | Current / last job status |
+| GET | `/api/v1/jobs/<job_id>` | Specific job details |
+
+### Trigger jobs via curl
+
+```bash
+# Run everything (tech + non-tech)
+curl -X POST http://localhost:5000/api/v1/run \
+  -H "Content-Type: application/json" \
+  -d '{"type": "all"}'
+
+# Run only tech
+curl -X POST http://localhost:5000/api/v1/run \
+  -H "Content-Type: application/json" \
+  -d '{"type": "tech"}'
+
+# Run only non-tech
+curl -X POST http://localhost:5000/api/v1/run \
+  -H "Content-Type: application/json" \
+  -d '{"type": "nontech"}'
+
+# Dry-run with a limit
+curl -X POST http://localhost:5000/api/v1/run \
+  -H "Content-Type: application/json" \
+  -d '{"type": "tech", "limit": 100, "dry_run": true}'
+```
+
+### Docker Compose (local)
+
+```bash
+cp .env.example .env
+# edit .env
+docker compose up --build -d
+```
+
+- App: `http://localhost:5000`
+- Grafana: `http://localhost:3000` (admin/admin)
+- Loki: `http://localhost:3100`
+
+### GCP deployment with systemd + gunicorn
+
+See [DEPLOYMENT.md](DEPLOYMENT.md) for full GCP Compute Engine setup.
 
 ## CLI options
 
