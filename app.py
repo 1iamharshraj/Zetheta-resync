@@ -41,7 +41,7 @@ if not os.path.isdir(RUN_OUTPUT_DIR):
 # ---------------------------------------------------------------------------
 # Logging
 # ---------------------------------------------------------------------------
-setup_logging(level=logging.INFO, loki_url=LOKI_URL, labels={"service": "zetheta-resync"})
+setup_logging(level=logging.INFO, loki_url=LOKI_URL, labels={"job": "app-logs", "service": "zetheta-resync"})
 
 # ---------------------------------------------------------------------------
 # Flask app + job tracker
