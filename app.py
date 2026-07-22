@@ -138,6 +138,10 @@ def build_config(payload: Dict[str, Any]) -> Dict[str, Any]:
         output = os.path.basename(output)
         output = os.path.join(RUN_OUTPUT_DIR, output)
 
+    user_ids = payload.get("user_ids", "")
+    if isinstance(user_ids, list):
+        user_ids = ",".join(str(uid) for uid in user_ids)
+
     return {
         "app_code": get_app_code(),
         "type": run_type,
@@ -146,6 +150,7 @@ def build_config(payload: Dict[str, Any]) -> Dict[str, Any]:
         "dry_run": dry_run,
         "output": output,
         "verbose": False,
+        "user_ids": user_ids,
     }
 
 

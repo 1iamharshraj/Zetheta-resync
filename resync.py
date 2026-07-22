@@ -417,9 +417,9 @@ def build_parser() -> argparse.ArgumentParser:
         help="Optional CSV path to write a summary of all processed records.",
     )
     parser.add_argument(
-        "--verbose",
-        action="store_true",
-        help="Show per-record debug messages in addition to the summary.",
+        "--user-ids",
+        default="",
+        help="Comma-separated list of user IDs to process (default: all).",
     )
     return parser
 
@@ -501,6 +501,10 @@ def _run_resync_impl(config: Dict[str, Any], job_id: str, run_type: str) -> Dict
     output = config.get("output", "")
     verbose = bool(config.get("verbose", False))
     app_code = config.get("app_code", "")
+    user_ids = config.get("user_ids", "")
+    allowed_user_ids = set()
+    if user_ids:
+        allowed_user_ids = {uid.strip() for uid in str(user_ids).split(",") if uid.strip()}
 
     if not app_code:
         raise ValueError("app_code is required")
@@ -523,6 +527,17 @@ def _run_resync_impl(config: Dict[str, Any], job_id: str, run_type: str) -> Dict
         except RuntimeError as exc:
             logging.error("[ERROR] Could not fetch %s submissions: %s", submission_type, exc)
             raise
+
+        if allowed_user_ids:
+            submissions = [
+                s for s in submissions if str(s.get("user_id")) in allowed_user_ids
+            ]
+            logging.info(
+                "[FILTER] Processing %s %s submission(s) matching user IDs: %s",
+                len(submissions),
+                submission_type,
+                ",".join(sorted(allowed_user_ids)),
+            )
 
         if limit > 0:
             submissions = submissions[:limit]
@@ -668,6 +683,7 @@ def main() -> int:
         "dry_run": args.dry_run,
         "output": args.output,
         "verbose": args.verbose,
+        "user_ids": args.user_ids,
     }
 
     try:
