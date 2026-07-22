@@ -4,44 +4,60 @@
 
 set -euo pipefail
 
-PROJECT_DIR="/opt/zetheta-resync"
+PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SERVICE_FILE="scripts/resync-zetheta.service"
+SERVICE_NAME="resync-zetheta"
+USER="${SUDO_USER:-$USER}"
+GROUP="$(id -gn "$USER" 2>/dev/null || echo "$USER")"
 
 # Update system packages and install dependencies.
 sudo apt-get update
-sudo apt-get install -y python3-pip python3-venv git docker.io docker-compose
+sudo apt-get install -y python3-pip python3-venv python3-full git docker.io docker-compose
 
-# Clone or pull the repo.
-if [[ -d "$PROJECT_DIR/.git" ]]; then
-    cd "$PROJECT_DIR"
-    sudo -H -u ubuntu git pull
-else
-    sudo mkdir -p "$PROJECT_DIR"
-    sudo chown ubuntu:ubuntu "$PROJECT_DIR"
-    # Replace the URL below with your actual repository URL.
-    sudo -H -u ubuntu git clone https://github.com/YOUR_ORG/zetheta-resync.git "$PROJECT_DIR"
-fi
+# Stop any old standalone Loki/Grafana containers that may conflict with our ports.
+for container in loki grafana; do
+    if sudo docker ps -q -f "name=$container" | grep -q .; then
+        echo "Stopping existing container: $container"
+        sudo docker stop "$container"
+        sudo docker rm "$container" || true
+    fi
+done
+
+# Ensure the project directory is owned by the deploy user.
+sudo chown -R "$USER:$GROUP" "$PROJECT_DIR" || true
 
 cd "$PROJECT_DIR"
 
-# Install Python dependencies.
-sudo -H -u ubuntu python3 -m pip install --user -r requirements.txt
+# Create Python virtual environment and install dependencies.
+if [[ ! -d .venv ]]; then
+    python3 -m venv .venv
+fi
+.venv/bin/pip install --upgrade pip
+.venv/bin/pip install -r requirements.txt
 
 # Create .env if missing (copy from example). Edit manually if needed.
 if [[ ! -f .env ]]; then
-    sudo -H -u ubuntu cp .env.example .env
+    cp .env.example .env
     echo "WARNING: .env was created from .env.example. Please edit $PROJECT_DIR/.env with the real APP_CODE."
 fi
 
 # Start Loki + Grafana via Docker Compose.
 sudo docker compose up -d loki grafana
 
-# Install systemd service for the app.
-sudo cp "$SERVICE_FILE" /etc/systemd/system/resync-zetheta.service
+# Install and configure systemd service for the app.
+# Generate a temporary service file with the correct user and project path.
+sed -e "s|User=ubuntu|User=$USER|g" \
+    -e "s|Group=ubuntu|Group=$GROUP|g" \
+    -e "s|/opt/zetheta-resync|$PROJECT_DIR|g" \
+    "$SERVICE_FILE" > /tmp/resync-zetheta.service
+
+sudo cp /tmp/resync-zetheta.service /etc/systemd/system/$SERVICE_NAME.service
 sudo systemctl daemon-reload
-sudo systemctl enable resync-zetheta
-sudo systemctl restart resync-zetheta
+sudo systemctl enable $SERVICE_NAME
+sudo systemctl restart $SERVICE_NAME
 
 echo "Deployment complete."
-echo "App:     http://$(curl -s -H 'Metadata-Flavor: Google' http://metadata.google.internal/computeMetadata/v1/instance/network-interfaces/0/access-configs/0/external-ip 2>/dev/null || echo 'VM_IP'):5000"
-echo "Grafana: http://$(curl -s -H 'Metadata-Flavor: Google' http://metadata.google.internal/computeMetadata/v1/instance/network-interfaces/0/access-configs/0/external-ip 2>/dev/null || echo 'VM_IP'):3000 (admin/admin)"
+
+EXTERNAL_IP=$(curl -s -H 'Metadata-Flavor: Google' http://metadata.google.internal/computeMetadata/v1/instance/network-interfaces/0/access-configs/0/external-ip 2>/dev/null || echo 'VM_EXTERNAL_IP')
+echo "App:     http://$EXTERNAL_IP:5000"
+echo "Grafana: http://$EXTERNAL_IP:3000 (admin/admin)"

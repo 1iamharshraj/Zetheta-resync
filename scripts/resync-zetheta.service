@@ -8,7 +8,6 @@ User=ubuntu
 Group=ubuntu
 WorkingDirectory=/opt/zetheta-resync
 Environment="PATH=/usr/local/bin:/usr/bin:/bin"
-EnvironmentFile=/opt/zetheta-resync/.env
 ExecStart=/opt/zetheta-resync/scripts/start.sh
 ExecReload=/bin/kill -HUP $MAINPID
 Restart=on-failure

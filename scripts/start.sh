@@ -9,6 +9,14 @@ PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 
 cd "$PROJECT_DIR"
 
+# Activate the virtual environment created by deploy-gcp.sh.
+if [[ -f .venv/bin/activate ]]; then
+    # shellcheck source=/dev/null
+    source .venv/bin/activate
+else
+    echo "WARNING: .venv not found. Falling back to system python." >&2
+fi
+
 # Load environment variables from .env if present.
 if [[ -f .env ]]; then
     set -a
