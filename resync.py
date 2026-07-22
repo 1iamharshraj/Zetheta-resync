@@ -569,20 +569,19 @@ def _run_resync_impl(config: Dict[str, Any], job_id: str, run_type: str) -> Dict
                 all_results.append(result)
                 completed += 1
 
-                if verbose:
-                    logging.debug(
-                        "[RECORD] uid=%s cid=%s status=%s pct=%s msg=%s",
-                        result.user_id,
-                        result.course_id,
-                        result.status,
-                        result.percentage,
-                        result.message,
+                logging.info(
+                    "[RECORD] status=%s user_id=%s course_id=%s percentage=%s message=%s",
+                    result.status,
+                    result.user_id,
+                    result.course_id,
+                    result.percentage,
+                    result.message,
+                )
+
+                if completed % 50 == 0 or completed == total:
+                    logging.info(
+                        "[PROGRESS] %s: %d/%d processed", submission_type, completed, total
                     )
-                else:
-                    if completed % 50 == 0 or completed == total:
-                        logging.info(
-                            "[PROGRESS] %s: %d/%d processed", submission_type, completed, total
-                        )
 
         # Per-type summary.
         statuses = {}
