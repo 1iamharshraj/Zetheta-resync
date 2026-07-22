@@ -2,11 +2,12 @@ services:
   loki:
     image: grafana/loki:2.9.0
     container_name: zetheta-loki
+    user: "root"
     ports:
       - "3100:3100"
     volumes:
       - ./loki/loki-config.yaml:/etc/loki/local-config.yaml:ro
-      - loki-data:/tmp/loki
+      - loki-data:/loki
     command: -config.file=/etc/loki/local-config.yaml
     networks:
       - zetheta-net
