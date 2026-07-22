@@ -27,7 +27,7 @@ fi
 
 export APP_CODE="${APP_CODE:-}"
 export FLASK_PORT="${FLASK_PORT:-5000}"
-export LOKI_URL="${LOKI_URL:-http://localhost:3100}"
+export LOKI_URL="http://localhost:3100"
 export RUN_OUTPUT_DIR="${RUN_OUTPUT_DIR:-./runs}"
 export WORKERS="${WORKERS:-1}"
 
