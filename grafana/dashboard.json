@@ -334,44 +334,7 @@
     "resync"
   ],
   "templating": {
-    "list": [
-      {
-        "current": {
-          "selected": false,
-          "text": "All",
-          "value": ""
-        },
-        "datasource": "Loki",
-        "definition": "",
-        "hide": 0,
-        "includeAll": true,
-        "multi": true,
-        "name": "job_id",
-        "options": [],
-        "query": "label_values(job_id)",
-        "refresh": 1,
-        "sort": 0,
-        "type": "query"
-      },
-      {
-        "current": {
-          "selected": false,
-          "text": "All",
-          "value": ""
-        },
-        "datasource": "Loki",
-        "definition": "",
-        "hide": 0,
-        "includeAll": true,
-        "multi": true,
-        "name": "run_type",
-        "options": [],
-        "query": "label_values(run_type)",
-        "refresh": 1,
-        "sort": 0,
-        "type": "query"
-      }
-    ]
+    "list": []
   },
   "time": {
     "from": "now-6h",
