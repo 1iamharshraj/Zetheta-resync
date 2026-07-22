@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """Extract skipped and error records from the resync log file.
 
-The log file is expected to contain JSON-formatted log lines written by the
-LokiJsonFormatter, where each [RECORD] line includes status, user_id,
-course_id, percentage, and message fields.
+The log file is expected to contain plain text log lines written by the gunicorn
+error logger, where each [RECORD] line includes status, user_id, course_id,
+percentage, and message fields.
 
 Usage:
     python3 extract_skipped_errors.py [log_file]
@@ -14,7 +14,6 @@ Outputs:
 """
 
 import csv
-import json
 import re
 import sys
 from pathlib import Path
@@ -31,18 +30,12 @@ def parse_log_file(log_path: Path) -> tuple[List[dict], List[dict]]:
             if not line or "|" not in line:
                 continue
 
-            # Log format: "2026-07-22 01:05:29 | INFO | {json}"
+            # Log format: "2026-07-22 01:05:29 | INFO | [RECORD] status=..."
             parts = line.split("|", 2)
             if len(parts) < 3:
                 continue
 
-            json_str = parts[2].strip()
-            try:
-                record = json.loads(json_str)
-            except json.JSONDecodeError:
-                continue
-
-            message = record.get("message", "")
+            message = parts[2].strip()
             if not message.startswith("[RECORD]"):
                 continue
 
