@@ -133,6 +133,46 @@ def fetch_json(url: str, headers: Optional[Dict[str, str]] = None, timeout: int 
     return {}
 
 
+def check_url_exists(url: str, timeout: int = 30, retries: int = 3) -> bool:
+    """Send a HEAD request and return True only if the URL returns HTTP 200."""
+    req_headers = dict(REQUEST_HEADERS)
+    last_exc: Optional[Exception] = None
+
+    for attempt in range(retries + 1):
+        request = urllib.request.Request(url, headers=req_headers, method="HEAD")
+        try:
+            with urllib.request.urlopen(request, timeout=timeout) as response:
+                return response.status == 200
+        except urllib.error.HTTPError as exc:
+            if exc.code in (403, 404):
+                return False
+            if exc.code >= 500:
+                last_exc = exc
+                logging.warning(
+                    "[RETRY] HEAD HTTP %s for %s (attempt %d/%d)",
+                    exc.code, url, attempt + 1, retries + 1,
+                )
+                if attempt < retries:
+                    time.sleep(2 ** attempt)
+                    continue
+                break
+            return False
+        except urllib.error.URLError as exc:
+            last_exc = exc
+            logging.warning(
+                "[RETRY] HEAD network error for %s (attempt %d/%d): %s",
+                url, attempt + 1, retries + 1, exc.reason,
+            )
+            if attempt < retries:
+                time.sleep(2 ** attempt)
+                continue
+            break
+
+    if last_exc:
+        logging.warning("[RETRY] HEAD max retries exceeded for %s: %s", url, last_exc)
+    return False
+
+
 def post_json(url: str, payload: Dict[str, Any], timeout: int = 60) -> Dict[str, Any]:
     """POST JSON payload and return the parsed JSON response (or a success dict if body is not JSON)."""
     body = json.dumps(payload).encode("utf-8")
@@ -265,29 +305,37 @@ def _process_single_record_impl(
         result.message = "Missing user_id, course_id, or role_id"
         return result
 
-    # 1. Try report URIs in order (primary, then fallback for tech submissions).
+    # 1. Verify PDF exists in tech/non-tech S3 buckets and fetch the matching JSON for the score.
     report_json: Dict[str, Any] = {}
-    tried_uris: List[str] = []
-    used_uri = ""
+    tried_pdf_uris: List[str] = []
+    used_pdf_uri = ""
 
-    for uri in build_report_uris(record, is_tech):
-        tried_uris.append(uri)
+    for json_uri in build_report_uris(record, is_tech):
+        pdf_uri = json_uri.replace(".json", ".pdf")
+        tried_pdf_uris.append(pdf_uri)
+        if not check_url_exists(pdf_uri):
+            continue
+        used_pdf_uri = pdf_uri
         try:
-            report_json = fetch_json(uri)
+            report_json = fetch_json(json_uri)
         except RuntimeError as exc:
             result.status = "error"
             result.message = f"Report fetch failed: {exc}"
             return result
         if report_json:
-            used_uri = uri
             break
+
+    if not used_pdf_uri:
+        result.status = "skipped"
+        result.message = f"PDF report not found in any tried URI: {tried_pdf_uris}"
+        return result
 
     if not report_json:
         result.status = "skipped"
-        result.message = f"Report JSON empty or inaccessible for all tried URIs: {tried_uris}"
+        result.message = f"PDF exists but JSON report empty or inaccessible for: {used_pdf_uri}"
         return result
 
-    result.report_uri = used_uri
+    result.report_uri = used_pdf_uri
 
     # 2. Extract percentage.
     percentage = extract_percentage(report_json)
@@ -297,12 +345,12 @@ def _process_single_record_impl(
         return result
     result.percentage = percentage
 
-    if is_tech and used_uri != tried_uris[0]:
+    if is_tech and used_pdf_uri.replace(".pdf", ".json") != build_report_uris(record, is_tech)[0]:
         logging.debug(
-            "[FALLBACK] uid=%s used non-tech report URI: %s", user_id, used_uri
+            "[FALLBACK] uid=%s used non-tech report URI: %s", user_id, used_pdf_uri
         )
 
-    # 3. Build update payload.
+    # 3. Build update payload with PDF report_uri.
     payload = {
         "app_code": app_code,
         "user_id": user_id,
